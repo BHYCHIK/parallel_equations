@@ -12,7 +12,7 @@
 #include <mpi.h>
 #include <math.h>
 
-#define N 11
+#define N 3
 
 static void print_equation(double matr[N][N + 1]) {
 	int i = 0, j = 0;
@@ -38,9 +38,25 @@ static double sqr(double a) {
 }
 
 static void operate(double *first_equation, double *second_equation, double c, double s, int columns_per_proc) {
+	/*
 	int i;
 	for (i = 0; i < columns_per_proc; ++i)
 		second_equation[i]++;
+	*/
+
+
+	static double first_equation_copy[N + 1];
+	static double second_equation_copy[N + 1];
+
+	int i = 0;
+	for (i = 0; i < columns_per_proc; ++i) {
+		first_equation_copy[i]= first_equation[i];
+		second_equation_copy[i]= second_equation[i];
+
+		first_equation[i] = first_equation_copy[i] * c + second_equation_copy[i] * s;
+		second_equation[i] = second_equation_copy[i] * c - first_equation_copy[i] * s;
+	}
+
 }
 
 static void solve(int proc_id, int proc_num, double matr[N][N+1]) {
@@ -60,6 +76,8 @@ static void solve(int proc_id, int proc_num, double matr[N][N+1]) {
 				MPI_Bcast(&buf, 2, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 				c = buf[0];
 				s = buf[1];
+
+				if (proc_id == 0) printf("%d %d %lf %lf\n", i, j, c, s);
 			}
 
 			double *mem = NULL;
