@@ -12,7 +12,7 @@
 #include <mpi.h>
 #include <math.h>
 
-#define N 307199
+#define N 1023
 
 static void print_equation(double matr[N][N + 1]) {
 	int i = 0, j = 0;
