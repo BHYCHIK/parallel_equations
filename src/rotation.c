@@ -12,7 +12,7 @@
 #include <mpi.h>
 #include <math.h>
 
-#define N 3
+#define N 307199
 
 static void print_equation(double matr[N][N + 1]) {
 	int i = 0, j = 0;
@@ -143,6 +143,7 @@ static void solve_equation(int proc_id, int proc_num) {
 int main(int argc, char* argv[]){
 	int  proc_id; /* rank of process */
 	int  proc_num;       /* number of processes */
+	double start = MPI_Wtime()
 
 	/* start up MPI */
 
@@ -155,6 +156,10 @@ int main(int argc, char* argv[]){
 	MPI_Comm_size(MPI_COMM_WORLD, &proc_num);
 
 	solve_equation(proc_id, proc_num);
+
+	double stop = MPI_Wtime();
+
+	if (proc_id == 0) printf("Used %lf seconds", stop - start);
 
 	/* shut down MPI */
 	MPI_Finalize(); 
