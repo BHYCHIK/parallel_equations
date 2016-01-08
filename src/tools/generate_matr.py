@@ -1,5 +1,5 @@
 import random
-N = 1023
+N = 255
 for i in xrange(0, N):
 	for j in xrange(0, N):
 		if i == j:

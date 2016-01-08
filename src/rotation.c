@@ -12,6 +12,7 @@
 #include <mpi.h>
 #include <math.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define N 3
 
@@ -28,26 +29,44 @@ static double sqr(double a) {
 	return a * a;
 }
 
-static void transform_matrix(int proc_id, double matr[][N], int columns_per_proc) {
+static void transform_matrix2(int proc_id, double matr[][N], int columns_per_proc) {
 	int i, j, k;
 	for (i = 0; i < N - 1; ++i) {
+
+		int worker_with_i = i / columns_per_proc;
+		static double column_i[N];
+
+		if (worker_with_i == proc_id) {
+			//printf("YYY%dYYY\n",proc_id);
+			for (j = 0; j < N; ++j) {
+				column_i[j] = matr[i % columns_per_proc][j];
+				//printf("XXX%lfXXX\n", matr[i % columns_per_proc][j]);
+			}
+		}
+		//printf("worker_with_id %d\n", worker_with_i);
+		MPI_Bcast(column_i, N, MPI_DOUBLE, worker_with_i, MPI_COMM_WORLD);
+		//printf("i=%d proc=%d ", i, proc_id);
+		for (j = 0; j < N; ++j) {
+			//printf("%lf ", column_i[j]);
+		}
+		//printf("\n");
+
 		for (j = i + 1; j < N; ++j) {
 
 			double c = 0.0, s = 0.0;
 
-			int worker_with_i = i / columns_per_proc;
 			double buf[2];
 
-			buf[0] = matr[i % columns_per_proc][i] / sqrt(sqr(matr[i % columns_per_proc][i]) + matr[i % columns_per_proc][j]);
-			buf[1]= matr[i % columns_per_proc][j] / sqrt(sqr(matr[i % columns_per_proc][i]) + matr[i % columns_per_proc][j]);
-
-			MPI_Bcast(&buf, 2, MPI_DOUBLE, worker_with_i, MPI_COMM_WORLD);
-
-			c = buf[0];
-			s = buf[1];
+			//printf("CALCING: %lf %lf %lf\n", column_i[i], column_i[i], column_i[j]);
+			c = column_i[i] / sqrt(sqr(column_i[i]) + sqr(column_i[j]));
+			s = column_i[j] / sqrt(sqr(column_i[i]) + sqr(column_i[j]));
 
 			static double first_equation_copy[N + 1];
 			static double second_equation_copy[N + 1];
+
+			//printf("BEFORE2: %lf %lf\n", column_i[j], matr[i][j]);
+			//printf("BEFORE1: %lf %lf\n", column_i[i], matr[i][i]);
+
 
 			for (k = 0; k < columns_per_proc; ++k) {
 				first_equation_copy[k] = matr[k][i];
@@ -56,23 +75,41 @@ static void transform_matrix(int proc_id, double matr[][N], int columns_per_proc
 				matr[k][i] = first_equation_copy[k] * c + second_equation_copy[k] * s;
 				matr[k][j] = second_equation_copy[k] * c - first_equation_copy[k] * s;
 			}
+
+			double tmp_column_i_i = column_i[i];
+			double tmp_column_i_j = column_i[j];
+			printf("c=%lf s=%lf\n", c, s);
+			column_i[i] = tmp_column_i_i * c + tmp_column_i_j * s;
+			column_i[j] = tmp_column_i_j * c - tmp_column_i_i * s;
+
+			if (column_i[i] != matr[i][i]) {
+				//printf("FUCKOF1: %d %d %lf %lf\n", i, j, column_i[i], matr[i][i]);
+			}
+			if (column_i[j] != matr[i][j]) {
+				//printf("FUCKOF2: %d %d %lf %lf\n", i, j, column_i[j], matr[i][j]);
+			}
+			//assert(column_i[i] == matr[i][i]);
+			//assert(column_i[j] == matr[i][j]);
 		}
 	}
+
 }
 
 static void solve(int proc_id, int proc_num, double matr[N + 1][N]) {
 	int i, j;
 	int columns_per_proc = ceil((N + 1.0) / proc_num);
+	printf("columns_per_proc=%d\n", columns_per_proc);
 
 	void *work_buffer = malloc(columns_per_proc * N * sizeof(double));
 
 	MPI_Scatter(matr, columns_per_proc * N, MPI_DOUBLE, work_buffer,
 			columns_per_proc * N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-	transform_matrix(proc_id, work_buffer, columns_per_proc);
+	transform_matrix2(proc_id, work_buffer, columns_per_proc);
 
 	MPI_Gather(work_buffer, columns_per_proc * N, MPI_DOUBLE, matr, columns_per_proc * N,
 			MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	free(work_buffer);
 
 	if (proc_id == 0) {
 
@@ -85,7 +122,6 @@ static void solve(int proc_id, int proc_num, double matr[N + 1][N]) {
 
 	}
 
-	free(work_buffer);
 }
 
 static void solve_equation(int proc_id, int proc_num) {
@@ -107,7 +143,6 @@ int main(int argc, char* argv[]){
 
 	double start = MPI_Wtime();
 
-
 	/* find out process rank */
 	MPI_Comm_rank(MPI_COMM_WORLD, &proc_id);
 
@@ -118,7 +153,7 @@ int main(int argc, char* argv[]){
 
 	double stop = MPI_Wtime();
 
-	if (proc_id == 0) printf("Used %lf seconds", stop - start);
+	if (proc_id == 0) printf("Used %lf seconds\n", stop - start);
 
 	/* shut down MPI */
 	MPI_Finalize(); 
