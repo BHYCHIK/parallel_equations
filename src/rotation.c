@@ -13,6 +13,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <pcontrol.h>
 
 #define N 3
 
@@ -140,6 +141,10 @@ int main(int argc, char* argv[]){
 	/* start up MPI */
 
 	MPI_Init(&argc, &argv);
+    MPI_Pcontrol(TRACEFILES, NULL, "tracefilename", 0);
+    MPI_Pcontrol(TRACELEVEL, 1, 1, 1);
+    MPI_Pcontrol(TRACENODE, 1000000, 1, 1);
+
 
 	double start = MPI_Wtime();
 
